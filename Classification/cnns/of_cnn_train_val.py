@@ -27,6 +27,7 @@ import vgg_model
 import alexnet_model
 import inception_model
 import mobilenet_v2_model
+import mobilenet_v1_model
 
 parser = configs.get_parser()
 args = parser.parse_args()
@@ -38,6 +39,8 @@ val_batch_size = total_device_num * args.val_batch_size_per_device
 (C, H, W) = args.image_shape
 epoch_size = math.ceil(args.num_examples / train_batch_size)
 num_val_steps = int(args.num_val_examples / val_batch_size)
+if args.channel_last is None:
+    args.channel_last = False 
 
 
 model_dict = {
@@ -47,11 +50,13 @@ model_dict = {
     "inceptionv3": inception_model.inceptionv3,
     "mobilenetv2": mobilenet_v2_model.Mobilenet,
     "resnext50": resnext_model.resnext50,
+    "mobilenetv1": mobilenet_v1_model.Mobilenet_V1,
 }
 
 
-flow.config.gpu_device_num(args.gpu_num_per_node)
+#flow.config.gpu_device_num(args.gpu_num_per_node)
 #flow.config.enable_debug_mode(True)
+flow.config.cpu_device_num(args.gpu_num_per_node)
 
 if args.use_fp16 and args.num_nodes * args.gpu_num_per_node > 1:
     flow.config.collective_boxing.nccl_fusion_all_reduce_use_buffer(False)
@@ -115,10 +120,13 @@ def InferenceNet():
 
 
 def main():
+    print('InitNodes')
     InitNodes(args)
     flow.env.log_dir(args.log_dir)
 
+    print('Summary')
     summary = Summary(args.log_dir, args)
+    print('Snapshot')
     snapshot = Snapshot(args.model_save_dir, args.model_load_dir)
 
     for epoch in range(args.num_epochs):
